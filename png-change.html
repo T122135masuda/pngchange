@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>18セクション スプライトアニメーション</title>
+  <style>
+    body {
+      font-family: sans-serif;
+    }
+    #controls {
+      margin-bottom: 10px;
+    }
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      gap: 20px;
+    }
+    .section {
+      text-align: center;
+    }
+    canvas {
+      width: 192px;
+      height: 64px;
+      border: 1px solid #333;
+      image-rendering: pixelated;
+    }
+    .checkbox-list {
+      margin: 10px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>画像をアップロードしてください（576x384）</h2>
+  <input type="file" id="imageInput" accept="image/*">
+
+  <div id="controls">
+    <button id="toggleBtn">⏸ 再生/停止</button>
+  </div>
+
+  <div class="checkbox-list" id="sectionToggles"></div>
+  <div id="grid"></div>
+
+  <script>
+    const FRAME_WIDTH = 64;
+    const FRAME_HEIGHT = 64;
+    const FRAMES_PER_SECTION = 3;
+    const SECTIONS_PER_ROW = 3;
+    const SECTIONS_PER_COLUMN = 6;
+    const TOTAL_SECTIONS = 18;
+    const FRAME_DURATION = 500;
+
+    let intervals = [];
+    let isPlaying = true;
+    const sectionCanvases = [];
+    const sectionCheckboxes = [];
+
+    const grid = document.getElementById('grid');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const sectionToggles = document.getElementById('sectionToggles');
+
+    document.getElementById('imageInput').addEventListener('change', handleImageUpload);
+    toggleBtn.addEventListener('click', togglePlay);
+
+    function handleImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const img = new Image();
+        img.onload = () => setupAnimations(img);
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function setupAnimations(image) {
+      clearAll();
+      for (let sectionIndex = 0; sectionIndex < TOTAL_SECTIONS; sectionIndex++) {
+        const row = Math.floor(sectionIndex / SECTIONS_PER_ROW);
+        const col = sectionIndex % SECTIONS_PER_ROW;
+        const startX = col * FRAMES_PER_SECTION * FRAME_WIDTH;
+        const startY = row * FRAME_HEIGHT;
+
+        // 🔢 ラベルとチェックボックスの表示番号を縦順に
+        const labelNumber = (sectionIndex % SECTIONS_PER_ROW) * SECTIONS_PER_COLUMN + Math.floor(sectionIndex / SECTIONS_PER_ROW) + 1;
+
+        // === DOM構築 ===
+        const wrapper = document.createElement('div');
+        wrapper.className = 'section';
+        wrapper.dataset.index = sectionIndex;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = FRAME_WIDTH * FRAMES_PER_SECTION;
+        canvas.height = FRAME_HEIGHT;
+        wrapper.appendChild(canvas);
+
+        const label = document.createElement('div');
+        label.textContent = `セクション ${labelNumber}`;
+
+        const frameLabel = document.createElement('span');
+        frameLabel.style.marginLeft = '10px';
+        frameLabel.textContent = '1';
+        label.appendChild(frameLabel);
+
+        wrapper.appendChild(label);
+        grid.appendChild(wrapper);
+        sectionCanvases.push({ canvas, wrapper });
+
+        // === チェックボックス ===
+        const checkbox = document.createElement('label');
+        checkbox.innerHTML = `<input type="checkbox" data-index="${sectionIndex}" checked> ${labelNumber}`;
+        sectionToggles.appendChild(checkbox);
+        sectionCheckboxes.push(checkbox.querySelector('input'));
+
+        checkbox.querySelector('input').addEventListener('change', (e) => {
+          const idx = Number(e.target.dataset.index);
+          sectionCanvases[idx].wrapper.style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        // === アニメーション ===
+        const ctx = canvas.getContext('2d');
+        let frame = 0;
+
+        const interval = setInterval(() => {
+          if (!isPlaying) return;
+          const sx = startX + frame * FRAME_WIDTH;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(
+            image,
+            sx, startY, FRAME_WIDTH, FRAME_HEIGHT,
+            0, 0, FRAME_WIDTH, FRAME_HEIGHT
+          );
+          frameLabel.textContent = String(frame + 1);
+          frame = (frame + 1) % FRAMES_PER_SECTION;
+        }, FRAME_DURATION);
+
+        intervals.push(interval);
+      }
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      toggleBtn.textContent = isPlaying ? '⏸ 再生/停止' : '▶️ 再生/停止';
+    }
+
+    function clearAll() {
+      intervals.forEach(clearInterval);
+      intervals = [];
+      sectionCanvases.length = 0;
+      sectionCheckboxes.length = 0;
+      grid.innerHTML = '';
+      sectionToggles.innerHTML = '';
+    }
+  </script>
+</body>
+</html>
