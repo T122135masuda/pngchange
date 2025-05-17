@@ -2,158 +2,251 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>18セクション スプライトアニメーション</title>
+  <title>スプライトアニメーションチェッカー</title>
   <style>
-    body {
-      font-family: sans-serif;
-    }
-    #controls {
-      margin-bottom: 10px;
-    }
-    #grid {
-      display: grid;
-      grid-template-columns: repeat(3, auto);
-      gap: 20px;
-    }
-    .section {
-      text-align: center;
-    }
+    body { font-family: sans-serif; }
+    #modeSelect { margin: 0 0 20px 10px; }
+    .checker { margin-top: 10px; }
+    #controls18, #controls4 { margin-bottom: 10px; }
+    .grid { display: grid; grid-template-columns: repeat(3, auto); gap: 20px; }
+    .section { text-align: center; }
     canvas {
-      width: 192px;
-      height: 64px;
+      width: 192px; height: 64px;
       border: 1px solid #333;
       image-rendering: pixelated;
     }
     .checkbox-list {
       margin: 10px 0;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
+      display: flex; flex-wrap: wrap; gap: 10px;
     }
   </style>
 </head>
 <body>
-  <h2>画像をアップロードしてください（576x384）</h2>
-  <input type="file" id="imageInput" accept="image/*">
+  <h1>スプライトアニメーションチェッカー</h1>
+  モード:
+  <select id="modeSelect">
+    <option value="mode18">18セクションチェッカー（576×384）</option>
+    <option value="mode4">歩行アニメーションチェッカー（144×192）</option>
+  </select>
 
-  <div id="controls">
-    <button id="toggleBtn">⏸ 再生/停止</button>
+  <!-- === 18セクションモード === -->
+  <div id="mode18" class="checker">
+    <h2>画像をアップロードしてください（576×384）</h2>
+    <input type="file" id="imageInput18" accept="image/*">
+    <div id="controls18">
+      <button id="toggleBtn18">⏸ 再生/停止</button>
+    </div>
+    <div class="checkbox-list" id="sectionToggles18"></div>
+    <div class="grid" id="grid18"></div>
   </div>
 
-  <div class="checkbox-list" id="sectionToggles"></div>
-  <div id="grid"></div>
+  <!-- === 4セクション歩行モード === -->
+  <div id="mode4" class="checker" style="display:none;">
+    <h2>画像をアップロードしてください（144×192）</h2>
+    <input type="file" id="imageInput4" accept="image/*">
+    <div id="controls4">
+      <button id="toggleBtn4">⏸ 再生/停止</button>
+    </div>
+    <div class="checkbox-list" id="sectionToggles4"></div>
+    <div class="grid" id="grid4"></div>
+  </div>
 
   <script>
-    const FRAME_WIDTH = 64;
-    const FRAME_HEIGHT = 64;
-    const FRAMES_PER_SECTION = 3;
-    const SECTIONS_PER_ROW = 3;
-    const SECTIONS_PER_COLUMN = 6;
-    const TOTAL_SECTIONS = 18;
-    const FRAME_DURATION = 500;
+    /* ---------------- モード切替 ---------------- */
+    const modeSelect = document.getElementById('modeSelect');
+    modeSelect.addEventListener('change', e => switchMode(e.target.value));
 
-    let intervals = [];
-    let isPlaying = true;
-    const sectionCanvases = [];
-    const sectionCheckboxes = [];
+    function switchMode(value) {
+      clearAll18();   // いったん両方とも停止
+      clearAll4();
+      document.getElementById('mode18').style.display = value === 'mode18' ? 'block' : 'none';
+      document.getElementById('mode4' ).style.display = value === 'mode4'  ? 'block' : 'none';
+    }
 
-    const grid = document.getElementById('grid');
-    const toggleBtn = document.getElementById('toggleBtn');
-    const sectionToggles = document.getElementById('sectionToggles');
+    /* ========== 18セクションチェッカー ========= */
+    const FRAME_WIDTH18 = 64,  FRAME_HEIGHT18 = 64;
+    const FRAMES_PER_SECTION18 = 3, SECTIONS_PER_ROW18 = 3, SECTIONS_PER_COLUMN18 = 6;
+    const TOTAL_SECTIONS18 = 18, FRAME_DURATION18 = 500;
 
-    document.getElementById('imageInput').addEventListener('change', handleImageUpload);
-    toggleBtn.addEventListener('click', togglePlay);
+    let intervals18 = [], isPlaying18 = true;
+    const sectionCanvases18 = [], sectionCheckboxes18 = [];
+    const grid18 = document.getElementById('grid18');
+    const toggleBtn18 = document.getElementById('toggleBtn18');
+    const sectionToggles18 = document.getElementById('sectionToggles18');
 
-    function handleImageUpload(event) {
-      const file = event.target.files[0];
+    document.getElementById('imageInput18').addEventListener('change', handleImageUpload18);
+    toggleBtn18.addEventListener('click', togglePlay18);
+
+    function handleImageUpload18(evt) {
+      const file = evt.target.files[0];
       if (!file) return;
-
       const reader = new FileReader();
-      reader.onload = function (e) {
+      reader.onload = e => {
         const img = new Image();
-        img.onload = () => setupAnimations(img);
+        img.onload = () => setupAnimations18(img);
         img.src = e.target.result;
       };
       reader.readAsDataURL(file);
     }
 
-    function setupAnimations(image) {
-      clearAll();
-      for (let sectionIndex = 0; sectionIndex < TOTAL_SECTIONS; sectionIndex++) {
-        const row = Math.floor(sectionIndex / SECTIONS_PER_ROW);
-        const col = sectionIndex % SECTIONS_PER_ROW;
-        const startX = col * FRAMES_PER_SECTION * FRAME_WIDTH;
-        const startY = row * FRAME_HEIGHT;
+    function setupAnimations18(image) {
+      clearAll18();
+      for (let i = 0; i < TOTAL_SECTIONS18; i++) {
+        const row = Math.floor(i / SECTIONS_PER_ROW18);
+        const col = i % SECTIONS_PER_ROW18;
+        const startX = col * FRAMES_PER_SECTION18 * FRAME_WIDTH18;
+        const startY = row * FRAME_HEIGHT18;
+        const labelNo = (i % SECTIONS_PER_ROW18) * SECTIONS_PER_COLUMN18 + Math.floor(i / SECTIONS_PER_ROW18) + 1;
 
-        // 🔢 ラベルとチェックボックスの表示番号を縦順に
-        const labelNumber = (sectionIndex % SECTIONS_PER_ROW) * SECTIONS_PER_COLUMN + Math.floor(sectionIndex / SECTIONS_PER_ROW) + 1;
-
-        // === DOM構築 ===
-        const wrapper = document.createElement('div');
-        wrapper.className = 'section';
-        wrapper.dataset.index = sectionIndex;
-
+        /* DOM */
+        const wrap = document.createElement('div');
+        wrap.className = 'section';
         const canvas = document.createElement('canvas');
-        canvas.width = FRAME_WIDTH * FRAMES_PER_SECTION;
-        canvas.height = FRAME_HEIGHT;
-        wrapper.appendChild(canvas);
-
+        canvas.width = FRAME_WIDTH18 * FRAMES_PER_SECTION18;
+        canvas.height = FRAME_HEIGHT18;
+        wrap.appendChild(canvas);
         const label = document.createElement('div');
-        label.textContent = `セクション ${labelNumber}`;
-
+        label.textContent = `セクション ${labelNo}`;
         const frameLabel = document.createElement('span');
         frameLabel.style.marginLeft = '10px';
         frameLabel.textContent = '1';
         label.appendChild(frameLabel);
+        wrap.appendChild(label);
+        grid18.appendChild(wrap);
+        sectionCanvases18.push({ canvas, wrap });
 
-        wrapper.appendChild(label);
-        grid.appendChild(wrapper);
-        sectionCanvases.push({ canvas, wrapper });
-
-        // === チェックボックス ===
-        const checkbox = document.createElement('label');
-        checkbox.innerHTML = `<input type="checkbox" data-index="${sectionIndex}" checked> ${labelNumber}`;
-        sectionToggles.appendChild(checkbox);
-        sectionCheckboxes.push(checkbox.querySelector('input'));
-
-        checkbox.querySelector('input').addEventListener('change', (e) => {
-          const idx = Number(e.target.dataset.index);
-          sectionCanvases[idx].wrapper.style.display = e.target.checked ? 'block' : 'none';
+        /* チェックボックス */
+        const cbLabel = document.createElement('label');
+        cbLabel.innerHTML = `<input type="checkbox" data-idx="${i}" checked> ${labelNo}`;
+        sectionToggles18.appendChild(cbLabel);
+        cbLabel.querySelector('input').addEventListener('change', e => {
+          const idx = +e.target.dataset.idx;
+          sectionCanvases18[idx].wrap.style.display = e.target.checked ? 'block' : 'none';
         });
 
-        // === アニメーション ===
+        /* アニメーション */
         const ctx = canvas.getContext('2d');
         let frame = 0;
-
-        const interval = setInterval(() => {
-          if (!isPlaying) return;
-          const sx = startX + frame * FRAME_WIDTH;
+        const timer = setInterval(() => {
+          if (!isPlaying18) return;
+          const sx = startX + frame * FRAME_WIDTH18;
           ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(
-            image,
-            sx, startY, FRAME_WIDTH, FRAME_HEIGHT,
-            0, 0, FRAME_WIDTH, FRAME_HEIGHT
-          );
+          ctx.drawImage(image, sx, startY, FRAME_WIDTH18, FRAME_HEIGHT18, 0, 0, FRAME_WIDTH18, FRAME_HEIGHT18);
           frameLabel.textContent = String(frame + 1);
-          frame = (frame + 1) % FRAMES_PER_SECTION;
-        }, FRAME_DURATION);
-
-        intervals.push(interval);
+          frame = (frame + 1) % FRAMES_PER_SECTION18;
+        }, FRAME_DURATION18);
+        intervals18.push(timer);
       }
     }
 
-    function togglePlay() {
-      isPlaying = !isPlaying;
-      toggleBtn.textContent = isPlaying ? '⏸ 再生/停止' : '▶️ 再生/停止';
+    function togglePlay18() {
+      isPlaying18 = !isPlaying18;
+      toggleBtn18.textContent = isPlaying18 ? '⏸ 再生/停止' : '▶️ 再生/停止';
     }
 
-    function clearAll() {
-      intervals.forEach(clearInterval);
-      intervals = [];
-      sectionCanvases.length = 0;
-      sectionCheckboxes.length = 0;
-      grid.innerHTML = '';
-      sectionToggles.innerHTML = '';
+    function clearAll18() {
+      intervals18.forEach(clearInterval);
+      intervals18 = [];
+      sectionCanvases18.length = 0;
+      sectionCheckboxes18.length = 0;
+      grid18.innerHTML = '';
+      sectionToggles18.innerHTML = '';
+      isPlaying18 = true;
+      toggleBtn18.textContent = '⏸ 再生/停止';
+    }
+
+    /* ========== 4セクション歩行チェッカー ========= */
+    const FRAME_WIDTH4 = 48, FRAME_HEIGHT4 = 48;
+    const FRAMES_PER_SECTION4 = 3, SECTIONS_PER_ROW4 = 1, SECTIONS_PER_COLUMN4 = 4;
+    const TOTAL_SECTIONS4 = 4, FRAME_DURATION4 = 500;
+
+    let intervals4 = [], isPlaying4 = true;
+    const sectionCanvases4 = [], sectionCheckboxes4 = [];
+    const grid4 = document.getElementById('grid4');
+    const toggleBtn4 = document.getElementById('toggleBtn4');
+    const sectionToggles4 = document.getElementById('sectionToggles4');
+
+    document.getElementById('imageInput4').addEventListener('change', handleImageUpload4);
+    toggleBtn4.addEventListener('click', togglePlay4);
+
+    function handleImageUpload4(evt) {
+      const file = evt.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => setupAnimations4(img);
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function setupAnimations4(image) {
+      clearAll4();
+      for (let i = 0; i < TOTAL_SECTIONS4; i++) {
+        const row = Math.floor(i / SECTIONS_PER_ROW4);
+        const col = i % SECTIONS_PER_ROW4;
+        const startX = col * FRAMES_PER_SECTION4 * FRAME_WIDTH4;
+        const startY = row * FRAME_HEIGHT4;
+        const labelNo = (i % SECTIONS_PER_ROW4) * SECTIONS_PER_COLUMN4 + Math.floor(i / SECTIONS_PER_ROW4) + 1;
+
+        /* DOM */
+        const wrap = document.createElement('div');
+        wrap.className = 'section';
+        const canvas = document.createElement('canvas');
+        canvas.width = FRAME_WIDTH4 * FRAMES_PER_SECTION4;
+        canvas.height = FRAME_HEIGHT4;
+        wrap.appendChild(canvas);
+        const label = document.createElement('div');
+        label.textContent = `セクション ${labelNo}`;
+        const frameLabel = document.createElement('span');
+        frameLabel.style.marginLeft = '10px';
+        frameLabel.textContent = '1';
+        label.appendChild(frameLabel);
+        wrap.appendChild(label);
+        grid4.appendChild(wrap);
+        sectionCanvases4.push({ canvas, wrap });
+
+        /* チェックボックス */
+        const cbLabel = document.createElement('label');
+        cbLabel.innerHTML = `<input type="checkbox" data-idx="${i}" checked> ${labelNo}`;
+        sectionToggles4.appendChild(cbLabel);
+        cbLabel.querySelector('input').addEventListener('change', e => {
+          const idx = +e.target.dataset.idx;
+          sectionCanvases4[idx].wrap.style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        /* アニメーション */
+        const ctx = canvas.getContext('2d');
+        const seq = [1, 2, 1, 0]; // 2,3,2,1 の順
+        let idx = 0;
+        const timer = setInterval(() => {
+          if (!isPlaying4) return;
+          const frame = seq[idx];
+          const sx = startX + frame * FRAME_WIDTH4;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(image, sx, startY, FRAME_WIDTH4, FRAME_HEIGHT4, 0, 0, FRAME_WIDTH4, FRAME_HEIGHT4);
+          frameLabel.textContent = String(frame + 1);
+          idx = (idx + 1) % seq.length;
+        }, FRAME_DURATION4);
+        intervals4.push(timer);
+      }
+    }
+
+    function togglePlay4() {
+      isPlaying4 = !isPlaying4;
+      toggleBtn4.textContent = isPlaying4 ? '⏸ 再生/停止' : '▶️ 再生/停止';
+    }
+
+    function clearAll4() {
+      intervals4.forEach(clearInterval);
+      intervals4 = [];
+      sectionCanvases4.length = 0;
+      sectionCheckboxes4.length = 0;
+      grid4.innerHTML = '';
+      sectionToggles4.innerHTML = '';
+      isPlaying4 = true;
+      toggleBtn4.textContent = '⏸ 再生/停止';
     }
   </script>
 </body>
